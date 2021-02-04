@@ -16,52 +16,90 @@ public struct ECScrollView<Content: View>: View {
     /// Scroll view's content offset
     @State private var contentOffset = CGPoint.zero
 
+    @State private var proxy: ScrollViewProxy?
+
     private let axes: Axis.Set
     private let showsIndicators: Bool
-    private let onContentOffsetChanged: ((CGSize, CGPoint) -> Void)?
-    private let didEndDecelerating: (() -> Void)?
+    private let onContentOffsetChanged: ((CGPoint, CGSize, ScrollViewProxy) -> Void)?
+    private let didEndDecelerating: ((CGPoint, ScrollViewProxy) -> Void)?
     private let content: Content
 
-    // MARK: - Lifecycle
+    // MARK: - Initializers
 
     public init(
         _ axes: Axis.Set,
         showsIndicators: Bool = true,
-        onContentOffsetChanged: ((CGSize, CGPoint) -> Void)? = nil,
-        didEndDecelerating: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
+    ) {
+        self.axes = axes
+        self.showsIndicators = showsIndicators
+        onContentOffsetChanged = nil
+        didEndDecelerating = nil
+        self.content = content()
+    }
+
+    private init(
+        _ axes: Axis.Set,
+        showsIndicators: Bool = true,
+        onContentOffsetChanged: ((CGPoint, CGSize, ScrollViewProxy) -> Void)? = nil,
+        didEndDecelerating: ((CGPoint, ScrollViewProxy) -> Void)? = nil,
+        content: Content
     ) {
         self.axes = axes
         self.showsIndicators = showsIndicators
         self.onContentOffsetChanged = onContentOffsetChanged
         self.didEndDecelerating = didEndDecelerating
-        self.content = content()
+        self.content = content
     }
 
     // MARK: - Public Properties
 
     public var body: some View {
-        ScrollView(axes, showsIndicators: showsIndicators) {
-            ZStack {
-                content
-                GeometryReader { geometry in
-                    Color.clear.preference(key: ContentOffsetPreferenceKey.self, value: geometry.frame(in: .named(Constants.coordinateSpace)).origin)
-                    Color.clear.preference(key: ContentSizePreferenceKey.self, value: geometry.size)
+        ScrollViewReader { proxy in
+            ScrollView(axes, showsIndicators: showsIndicators) {
+                ZStack {
+                    content
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: ContentOffsetPreferenceKey.self, value: geometry.frame(in: .named(Constants.coordinateSpace)).origin)
+                        Color.clear.preference(key: ContentSizePreferenceKey.self, value: geometry.size)
+                    }
                 }
             }
+            .coordinateSpace(name: Constants.coordinateSpace)
+            .onPreferenceChange(ContentOffsetPreferenceKey.self) { contentOffset = $0 }
+            .onPreferenceChange(ContentSizePreferenceKey.self) { contentSize = $0 }
+            .onChange(of: contentOffset) {
+                viewModel.scroll()
+                onContentOffsetChanged?($0, contentSize, proxy)
+            }
+            .onChange(of: contentSize) {
+                onContentOffsetChanged?(contentOffset, $0, proxy)
+            }
+            .onChange(of: viewModel.scrolling) { scrolling in
+                guard !scrolling else { return }
+                didEndDecelerating?(contentOffset, proxy)
+            }
         }
-        .coordinateSpace(name: Constants.coordinateSpace)
-        .onPreferenceChange(ContentOffsetPreferenceKey.self) { contentOffset = $0 }
-        .onPreferenceChange(ContentSizePreferenceKey.self) { contentSize = $0 }
-        .onChange(of: contentOffset) {
-            viewModel.scroll()
-            onContentOffsetChanged?(contentSize, $0)
-        }
-        .onChange(of: contentSize) { onContentOffsetChanged?($0, contentOffset) }
-        .onChange(of: viewModel.scrolling) { scrolling in
-            guard !scrolling else { return }
-            didEndDecelerating?()
-        }
+    }
+
+    public func didEndDecelerating(_ didEndDecelerating: @escaping (CGPoint, ScrollViewProxy) -> Void) -> Self {
+        ECScrollView(
+            axes,
+            showsIndicators: showsIndicators,
+            onContentOffsetChanged: onContentOffsetChanged,
+            didEndDecelerating: didEndDecelerating,
+            content: content
+        )
+    }
+
+    public func onContentOffsetChanged(_ onContentOffsetChanged: @escaping (CGPoint, CGSize, ScrollViewProxy) -> Void) -> Self {
+        ECScrollView(
+            axes,
+            showsIndicators: showsIndicators,
+            onContentOffsetChanged: onContentOffsetChanged,
+            didEndDecelerating: didEndDecelerating,
+            content: content
+        )
     }
 }
 
