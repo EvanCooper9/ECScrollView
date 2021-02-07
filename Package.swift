@@ -8,9 +8,19 @@ let package = Package(
         .iOS(.v14)
     ],
     products: [
-        .library(name: "ECScrollView", targets: ["ECScrollView"])
+        .library(name: "ECScrollView", targets: ["ECScrollView"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/combine-schedulers", from: "0.1.0")
     ],
     targets: [
-        .target(name: "ECScrollView", dependencies: [], path: "Sources")
+        .target(
+            name: "ECScrollView",
+            dependencies: [
+                .product(name: "CombineSchedulers", package: "combine-schedulers")
+            ],
+            path: "Sources"
+        ),
+        .testTarget(name: "ECScrollViewTests", dependencies: ["ECScrollView"], path: "Tests")
     ]
 )

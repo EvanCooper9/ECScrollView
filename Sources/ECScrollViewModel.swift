@@ -1,21 +1,22 @@
 import Combine
+import CombineSchedulers
 import SwiftUI
 
 final class ECScrollViewModel: ObservableObject {
 
+    let didScroll = PassthroughSubject<Void, Never>()
     @Published private(set) var scrolling = false
 
     // MARK: - Private Properties
 
-    private let didScroll = PassthroughSubject<Void, Never>()
     private var cancellable: AnyCancellable?
 
     // MARK: - Lifecycle
 
-    init() {
+    init(scheduler: AnySchedulerOf<DispatchQueue> = DispatchQueue.main.eraseToAnyScheduler()) {
         let stopped = didScroll
             .map({ false })
-            .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
+            .debounce(for: .seconds(0.5), scheduler: scheduler)
             .eraseToAnyPublisher()
 
         let scrolling = didScroll
@@ -25,11 +26,5 @@ final class ECScrollViewModel: ObservableObject {
         cancellable = scrolling
             .merge(with: stopped)
             .assign(to: \.scrolling, on: self)
-    }
-
-    // MARK: - Public Methods
-
-    func scroll() {
-        didScroll.send(())
     }
 }

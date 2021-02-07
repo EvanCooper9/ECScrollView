@@ -69,7 +69,7 @@ public struct ECScrollView<Content: View>: View {
             .onPreferenceChange(ContentOffsetPreferenceKey.self) { contentOffset = $0 }
             .onPreferenceChange(ContentSizePreferenceKey.self) { contentSize = $0 }
             .onChange(of: contentOffset) {
-                viewModel.scroll()
+                viewModel.didScroll.send()
                 onContentOffsetChanged?($0, contentSize, proxy)
             }
             .onChange(of: contentSize) {
